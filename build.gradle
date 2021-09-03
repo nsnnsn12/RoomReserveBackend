@@ -1,0 +1,106 @@
+plugins {
+	id "java-library"
+	id "checkstyle"
+	id "io.freefair.lombok" version "4.1.6"
+	id "org.springframework.boot" version "2.4.5"
+	id "io.spring.dependency-management" version "1.0.8.RELEASE"
+	id "org.asciidoctor.jvm.convert" version "3.1.0"
+	id "com.ewerk.gradle.plugins.querydsl" version "1.0.10"
+	id "com.gorylenko.gradle-git-properties" version "2.2.2"
+}
+
+group = "com.room.sharing.service"
+version = "0.0.1"
+sourceCompatibility = JavaVersion.VERSION_11
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation "org.springframework.boot:spring-boot-starter"
+	implementation "org.springframework.boot:spring-boot-starter-web"
+	implementation "org.springframework.boot:spring-boot-starter-data-jpa"
+	implementation "org.springframework.boot:spring-boot-starter-validation"
+	implementation "com.querydsl:querydsl-core"
+	implementation "com.querydsl:querydsl-jpa"
+	implementation "com.querydsl:querydsl-apt"
+	implementation "com.querydsl:querydsl-sql:4.3.1"
+	implementation "com.querydsl:querydsl-sql-spring:4.3.1"
+	implementation "org.apache.commons:commons-lang3:3.9"
+//	runtime "org.mariadb.jdbc:mariadb-java-client"
+	runtimeOnly "com.h2database:h2"
+
+	testRuntimeOnly "com.h2database:h2"
+	testImplementation 'org.springframework.restdocs:spring-restdocs-mockmvc'
+	testImplementation "org.springframework.boot:spring-boot-starter-test"
+}
+
+test {
+	failFast(true)
+	useJUnitPlatform()
+}
+
+asciidoctor {
+	baseDirFollowsSourceDir()
+	dependsOn test
+}
+
+bootJar {
+	dependsOn asciidoctor
+	from("${asciidoctor.outputDir}") {
+		into "static/docs"
+	}
+	archiveFileName.set "${rootProject.name}.jar"
+}
+
+task copyDocument(type: Copy) {
+	dependsOn asciidoctor
+	from file("build/docs/asciidoc")
+	into file("src/main/resources/static/docs")
+}
+
+build {
+	dependsOn copyDocument
+}
+
+//// querydsl 적용
+def querydslSrcDir = "src/main/generated"
+
+querydsl {
+	library = "com.querydsl:querydsl-apt"
+	jpa = true
+	querydslSourcesDir = querydslSrcDir
+}
+
+compileQuerydsl {
+	options.annotationProcessorPath = configurations.querydsl
+}
+
+configurations {
+	querydsl.extendsFrom compileClasspath
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+sourceSets {
+	main {
+		java {
+			srcDirs = ["src/main/java", querydslSrcDir]
+		}
+	}
+}
+
+project.afterEvaluate {
+	project.tasks.compileQuerydslJava {
+		onlyIf { false }
+	}
+}
+
+checkstyleMain {
+	checkstyleTest.enabled(false)
+	setSource("src/main/java")
+	ignoreFailures(false)
+	maxWarnings(0)
+}
